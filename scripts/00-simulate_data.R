@@ -1,19 +1,30 @@
 #### Preamble ####
-# Purpose: Simulates... [...UPDATE THIS...]
-# Author: Rohan Alexander [...UPDATE THIS...]
-# Date: 11 February 2023 [...UPDATE THIS...]
-# Contact: rohan.alexander@utoronto.ca [...UPDATE THIS...]
+# Purpose: Simulates match data for league of legends games
+# Author: Hritik Shukla
+# Date: 15 April 2024
+# Contact: hritik.shukla@mail.utoronto.ca
 # License: MIT
-# Pre-requisites: [...UPDATE THIS...]
-# Any other information needed? [...UPDATE THIS...]
 
 
 #### Workspace setup ####
 library(tidyverse)
-# [...UPDATE THIS...]
 
-#### Simulate data ####
-# [...ADD CODE HERE...]
+#### Workspace setup ####
+set.seed(853)
+
+num_obs <- 100
+
+#### Simulate data wotj####
+sim_match_data <- tibble(
+  result = sample(0:1, size = num_obs, replace = TRUE),
+  firstherald = sample(0:1, size = num_obs, replace = TRUE),
+  heralds = sample(0:2, size = num_obs, replace = TRUE),
+  firstdragon = sample(0:1, size = num_obs, replace = TRUE),
+  dragons = sample(0:4, size = num_obs, replace = TRUE),
+  firstbaron = sample(0:1, size = num_obs, replace = TRUE),
+  barons = sample(0:3, size = num_obs, replace = TRUE),
+  elders = sample(0:3, size = num_obs, replace = TRUE),
+)
 
 
 
