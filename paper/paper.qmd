@@ -1,16 +1,20 @@
 ---
-title: "My title"
-subtitle: "My subtitle if needed"
+title: "Investigating the Importance of Early Objective Control in Professional League of Legends"
+subtitle: "Studying the Impact of Neutral Objectives on Match Outcomes"
 author: 
-  - First author
-  - Another author
-thanks: "Code and data are available at: LINK."
+  - Hritik Shukla
+thanks: "Code and data are available at: https://github.com/hritikshuklas/earlyobjctrl_prolol"
 date: today
 date-format: long
-abstract: "First sentence. Second sentence. Third sentence. Fourth sentence."
+abstract: "This paper investigates the importance of early control over neutral objectives in professional League of Legends (LoL) esports. Leveraging data from Tier 1 leagues worldwide, we analyze the impact of securing neutral objectives such as the Rift Herald, Elemental Drakes, and Baron Nasher on a team's odds of winning. Through logistic regression modeling, our findings reveal that early control of neutral objectives significantly increases a team's odds of winning, with the magnitude of this effect varying across different objectives. We also explore the debate between prioritizing Rift Herald or Elemental Drakes, shedding light on strategic choices in high-level LoL gameplay."
 format: pdf
+output:
+  pdf_document: default
 number-sections: true
 bibliography: references.bib
+editor: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r}
@@ -19,203 +23,651 @@ bibliography: references.bib
 #| message: false
 
 library(tidyverse)
-library(palmerpenguins)
+library(rstanarm)
+library(arrow)
+library(ggplot2)
+library(knitr)
+library(modelsummary)
 ```
 
+```{r}
+#| include: false
+#| warning: false
+#| message: false
 
-# Introduction
+raw_data <- read_csv("../data/raw_data/2023_LoL_esports_match_data_from_OraclesElixir.csv")
 
-You can and should cross-reference sections and sub-sections. We use @citeR and @rohan.
+analysis_data <- read_parquet("../data/analysis_data/cleaned_data.parquet")
 
-The remainder of this paper is structured as follows. @sec-data....
+raw_data <- raw_data |>
+  select("league","teamname","result","firstherald",
+         "firstdragon","firstbaron") 
 
+analysis_data <- analysis_data |>
+  mutate(
+    result = factor(
+      result,
+      levels = c("Loss", "Win")
+    ),
+    firstherald = factor(
+      firstherald,
+      levels = c("No", "Yes")
+    ),
+    firstdragon = factor(
+      firstdragon,
+      levels = c("No", "Yes")
+    ),
+    firstbaron = factor(
+      firstbaron,
+      levels = c("No", "Yes")
+    )
+  )
 
+model <- readRDS(file="../models/neutral_obj_to_result_model.rds")
+```
+
+# Introduction {#sec-intro}
+
+League of Legends has had one of the most popular esports scene in the
+history of gaming. The 2023 LoL World Championship held in South Korea
+had the highest viewership of any esports event ever, with viewership
+peaking at 6.4 million concurrent viewers [@worldsviewership]. However,
+at the same time, many viewers have voiced their opinions about the
+current state of the game. Even though neutral objectives such as the
+Rift Herald, Elemental Drakes as well as the iconic Baron Nasher are
+important to the game's structure and strategies implemented by teams
+across the world, many viewers are claiming that the meta has become
+stale and boring because of the objective focused gameplay many teams
+have adapted, leading to slow and calculated gameplay instead of the
+volatile and explosive gameplay people tune in for [@objfocusedboring].
+
+This paper aims to find out if at the highest levels of play, focusing
+on these objectives matter at all or are pro players fighting for
+negligible advantages. In particular, the focus of this paper will be on
+early control of these objectives. By analysing games played in Tier 1
+League championships around the world, our aim is to see if a team's
+control on the first spawn of these neutral objectives influences their
+odds of winning the match. We want to determine how big, if any, do
+these objectives influence a team's ability to win a game.
+
+Another decision that players have to make in the early game is whether
+they want to prioritize the Rift Herald over Elemental Drakes. Both
+spawn around the same time on the map but on the opposite ends, leading
+to teams often needing to give one up for the other. This has been a
+popular subject of debate amongst the community for years
+[@riftordragon]. By finding out how each of these objectives effect the
+outcome of the game, we aim to see which objective teams should focus on
+between the two.
+
+The remainder of this paper is structured as follows:
+
+-   @sec-data explores the dataset and the variables within it used for
+    the study
+
+-   @sec-model explains our models setup and our assumptions going into
+    the study
+
+-   @sec-results explores our findings in detail
+
+-   @sec-discussion evaluates these findings in the context of our
+    reality
+
+I used R [@citeR], along with multiple packages to aid in the data
+analysis and modelling. More particularly, the packages tidyverse
+[@tidyverse], dplyr [@citeDplyr], tidyr [@citeTidyr] and arrow
+[@citeArrow] were used for data acquisition, testing and cleaning. The
+package rstanarm [@citeRstanarm] was used for modelling, and ggplot2
+[@citeGgplot2], knitr [@citeKnitr] and modelsummary [@citeModelsummary]
+were used for data visualization.
 
 # Data {#sec-data}
 
-Some of our data is of penguins (@fig-bills), from @palmerpenguins.
+The data used for this paper was acquired from Oracle's Elixir, founded
+in 2015 by Tim Sevenhuysen, a veteran in the esports Industry. Data from
+Oracle's Elixir is used by coaches, analysts and other professionals in
+the industry. This dataset keeps track of most professional leagues for
+League of Legends, major or minor, from all around the world and
+contains in-depth player, team and champion analytics
+[@oracleselixirabout]. This data is collected from various sources, such
+as the official LoL esports website [@lolesportsweb], official websites
+for individual leagues, fan-maintained wikis, Riot APIs, etc. We aim to
+study the influence of neutral objectives on the result of a game in
+Tier 1 leagues around the world. More specifically, we want to observe
+if being the first one to capture and total number of captures of the
+Rift Herald, Elemental Drakes, Baron Nashers, and Elder Drakes helps or
+hinders the chances of a team winning.
+
+## Data Cleaning {#sec-data-cleaning}
 
 ```{r}
-#| label: fig-bills
-#| fig-cap: Bills of penguins
+#| label: tbl-raw-data-preview
+#| tbl-cap: Raw Dataset Preview
 #| echo: false
 
-ggplot(penguins, aes(x = island, fill = species)) +
-  geom_bar(alpha = 0.8) +
-  scale_fill_manual(values = c("darkorange","purple","cyan4"),
-                    guide = "none") +
-  theme_minimal() +
-  facet_wrap(~species, ncol = 1) +
-  coord_flip()
+kable(head(raw_data, 10), booktabs=TRUE, format="latex")
 ```
 
-Talk more about it.
+The "league ", "split ", "role", "teamname", "side", "result",
+"firstherald", "heralds", "firstbaron", "barons", "firstdragon",
+"elementaldrakes", "elders" variables from CCES 2020 dataset (as seen in
+@tbl-raw-data-preview) were selected initially.
 
-And also planes (@fig-planes). (You can change the height and width, but don't worry about doing that until you have finished every other aspect of the paper - Quarto will try to make it look nice and the defaults usually work well once you have enough text.)
+The dataset contains match data for each individual player as well as
+for the team as a whole. We are interested in the performance of the
+team as a whole, so we filter out any individual player data using the
+"role" attribute.
+
+Next, we filter out any matches that didn't occur in a Tier 1 League,
+since we aim to study the influence of neutral objectives at the highest
+levels of play. The Tier 1 Leagues in League of Legends are:
+
+-   LCS, League Championship Series (North America)
+
+-   LEC, The League of Legends EMEA Championship (EMEA region)
+
+-   LCK, League of Legends Champions Korea (South Korea)
+
+-   LPL, League of Legends Pro League (China)
+
+-   VCS, Vietnam Championship Series (Vietnam)
+
+-   PCS, Pacific Championship Series (Taiwan)
+
+-   CBLOL, Campeonato Brasileiro de League of Legends (Brazil)
+
+-   LLA, Liga Latinoamérica (Latin America)
+
+Any entries which were missing any of the these variables we needed were
+removed during cleaning. This omission culled down our total match
+entries from 125,904 to 4,260. However, we still have more than enough
+data to derive meaningful results.
+
+Finally, the values for the Boolean categorical variables -
+"firstherald", "firstdragon", "firstbaron" - within the dataset were
+cleaned to more human-readable values. In the raw dataset, 0 was used to
+represent a non-positive outcome and 1 was used to represent a positive
+outcome. For example, for the "result" variable, "0" represented loss
+and "1" represented win; for the "firstherald" variable, "0" represented
+false and "1" represented true. In the cleaned dataset, these numbers
+were replaced by their intended values.
+
+The end result of the cleaning process leaves the dataset shown in
+@tbl-cleaned-data-preview.
 
 ```{r}
-#| label: fig-planes
-#| fig-cap: Relationship between wing length and width
+#| label: tbl-cleaned-data-preview
+#| tbl-cap: Cleaned Dataset preview
 #| echo: false
-#| warning: false
-#| message: false
 
-analysis_data <- read_csv(here::here("data/analysis_data/analysis_data.csv"))
-
-analysis_data |> 
-  ggplot(aes(x = width, y = length)) +
-  geom_point(alpha = 0.8) +
-  theme_minimal() +
-  labs(x = "Wing width (mm)",
-       y = "Wing length (mm)")
+col_names <- c("League", "Result", "Took First Herald","Took First Dragon", "Took First Baron")
+kable(head(analysis_data, 10), format="latex", booktabs=TRUE, col.names=col_names)
 ```
 
-Talk way more about it. 
+## Rift Herald {#sec-data-herald}
 
+```{r}
+#| label: fig-herald-histogram
+#| fig-cap: "First Herald Captured"
+#| echo: false
+#| fig-subcap: ["First Herald Captured", "First Herald Capture Split by Match Result"] 
+#| layout-ncol: 2
 
+# Create a histogram
+ggplot(analysis_data, aes(x = as_factor(firstherald))) +
+  geom_bar() +
+  labs(x = "", y = "Number of Teams") +
+  theme_minimal()
 
-# Model
+ggplot(analysis_data, aes(x = as_factor(firstherald))) +
+  geom_bar() +
+  labs(x = "", y = "Number of Teams") +
+  facet_wrap(~ result, scales="free") +
+  theme_minimal()
+```
 
-The goal of our modelling strategy is twofold. Firstly,...
+The Rift Herald is an early game neutral objective which spawns, up to
+two times, 8 minutes into the game and despawns 20 minutes into the
+game. It can be captured twice within this time span. Rift Herald, when
+used correctly, can help snow ball a team's leads or help them catch up
+to the enemy, as it helps take down enemy towers and provides with gold
+very early into the game, which pro players can take advantage of to
+build even greater leads.
 
-Here we briefly describe the Bayesian analysis model used to investigate... Background details and diagnostics are included in [Appendix -@sec-model-details].
+From our data, we can see that the first herald capture is split evenly,
+which is as expected as we take the team data of both teams in a match,
+and only one of them can have the first capture on the herald. It is
+also a possibility that neither teams contest for this objective,
+however this scenario seems to be rare, if not completely missing from
+our data. So, we can safely say that Rift Herald is an important
+objective for teams in the early game, and is always captured during its
+availability period.
+
+When we split our data by match results, a trend appears - winning teams
+had a higher frequency of capturing the herald first, whereas losing
+teams had a higher frequency of not capturing the herald first. This
+difference is large enough to be of statistical significance, and
+requires more research into it.
+
+## Elemental Drakes
+
+```{r}
+#| label: fig-drake-histogram
+#| fig-cap: Elemental Drake Capture Statistics
+#| echo: false
+#| fig-subcap: ["First Drake Captured", "First Drake Capture Split by Match Result"] 
+#| layout-ncol: 2
+
+# Create a histogram
+ggplot(analysis_data, aes(x = as_factor(firstdragon))) +
+  geom_bar() +
+  labs(x = "", y = "Number of Teams") +
+  theme_minimal()
+
+ggplot(analysis_data, aes(x = as_factor(firstdragon))) +
+  geom_bar() +
+  labs(x = "", y = "Number of Teams") +
+  facet_wrap(~ result, scales="free") +
+  theme_minimal()
+
+```
+
+The Elemental Drakes are a recurring neutral objective in this game that
+spawn multiple times per game. The first elemental drake spawns 5
+minutes into the game. After being captured, it spawns again 5 minutes
+later, up until either of the two teams have four total captures
+combined. The drakes offer gold to the members of the team upon kill, as
+well as different buffs which depend its base element (Infernal, Cloud,
+Ocean, etc.). If a team is first to capture four of the drakes, the team
+also gains a more powerful buff on top of the buffs already given,
+giving them a great advantage to help them secure a win.
+
+As expected again, we can see in @fig-drake-histogram that the first
+dragon capture is split evenly, which is as expected again since the
+drakes are a high priority objective and drake stacking is considered a
+powerful strategy towards winning the game.
+
+When we split our data by match results, we see a similar split as we
+saw with the Rift Herald - winning teams had a higher frequency of
+capturing the herald first, whereas losing teams had a higher frequency
+of not capturing the herald first. This difference is slightly larger
+than the one we saw in @fig-herald-histogram .
+
+## Baron Nasher {#sec-data-baron}
+
+```{r}
+#| label: fig-baron-histogram
+#| fig-cap: Baron Nasher Capture Statistics
+#| echo: false
+#| fig-subcap: ["First Baron Captured", "First Baron Capture Split by Match Result"] 
+#| layout-ncol: 2
+
+# Create a histogram
+ggplot(analysis_data, aes(x = as_factor(firstbaron))) +
+  geom_bar() +
+  labs(x = "", y = "Number of Teams") +
+  theme_minimal()
+
+ggplot(analysis_data, aes(x = as_factor(firstbaron))) +
+  geom_bar() +
+  labs(x = "", y = "Number of Teams") +
+  facet_wrap(~ result, scales="free") +
+  theme_minimal()
+
+```
+
+Baron Nasher is a late-game neutral objective which replaces the Rift
+Herald. It is a powerful monster with a massive health pool which
+usually requires the whole team to be present to be conquered, and is
+often highly contested due to its bounty. The team who kills baron
+successfully is rewarded with a ton of gold as well as a temporary buff
+which helps them take down the enemy base easier, increasing the odds in
+their favor heavily. Due to the nature of its buff, its generally
+considered to be a game ending decision and often converts a significant
+lead into a game ending push, but sometimes, although very rare, a
+clever steal can also result in the comeback for a team who has fallen
+behind.
+
+Unlike the Rift Herald and the drakes, the first Baron data in
+@fig-baron-histogram isn't evenly split. Although the difference is
+quite small, there is a higher frequency of teams who didn't get the
+first baron. This can only be explained if neither teams ever slayed the
+Baron, which does happen in games which snowball early really hard and
+end really quick. These games are quite uncommon, which is why the
+difference appears to be small.
+
+Finally, we see the true power of the Baron buff as a game-ender when we
+split our data by match results. We see that almost all teams who won
+their games got the first baron buff of the game, whereas almost all
+losing teams never got the first baron buff of the game. There are way
+too many game states to analyze in depth of how Baron can influence the
+odds of winning - an already snowballing team with a massive lead takes
+control of the Baron easily and conquers it with no hindrance from the
+enemy team; the fight for the buff ends a stalemate, etc. Another thing
+to note is that from the split, we can see that it is not a
+requirement - there are some people who won the game without ever
+getting the first Baron, but these graphs don't tell the whole story. As
+explained before, the game could have been a stomp and the winning team
+never needed the Baron in the first place, or the team made a comeback
+and lasted long enough to win the second baron fight. The game states in
+League of Legends can get as varied and complicated as chess, and it is
+out of the scope of this paper to delve into it. However, it is an
+interesting case to study further.
+
+# Model {#sec-model}
+
+We will be using logistic regression to model our data, where our
+outcome variable would be whether a team wins or loses their match.
+Whether a team secures the first herald, the first elemental drake, or
+the first baron will be used as predictors our outcome variable.
 
 ## Model set-up
 
-Define $y_i$ as the number of seconds that the plane remained aloft. Then $\beta_i$ is the wing width and $\gamma_i$ is the wing length, both measured in millimeters.  
+Define:
 
-\begin{align} 
-y_i|\mu_i, \sigma &\sim \mbox{Normal}(\mu_i, \sigma) \\
-\mu_i &= \alpha + \beta_i + \gamma_i\\
-\alpha &\sim \mbox{Normal}(0, 2.5) \\
-\beta &\sim \mbox{Normal}(0, 2.5) \\
-\gamma &\sim \mbox{Normal}(0, 2.5) \\
-\sigma &\sim \mbox{Exponential}(1)
+-   $y_i$ is the result of the match - whether a team won or lost
+
+-   $\mbox{firstherald}_i$ describes whether the team secured the first
+    Rift Herald spawn
+
+-   $\mbox{firstdragon}_i$ describes whether the team secured the first
+    Elemental Drake spawn
+
+-   $\mbox{firstbaron}_i$ describes whether the team secured the first
+    Baron Nasher spawn
+
+```{=tex}
+\begin{align}  
+  y_i|\pi_i &\sim \mbox{Bern}(\pi_i) \\ 
+  \mbox{logit}(\pi_i) &= \beta_0 + \beta_1 \times \mbox{firstherald}_i + \beta_2 \times \mbox{firstdragon}_i + \beta_3 \times \mbox{firstbaron}_i \\
+  \beta_0 &\sim \mbox{Normal}(0, 2.5) \\ 
+  \beta_1 &\sim \mbox{Normal}(0, 2.5) \\ 
+  \beta_2 &\sim \mbox{Normal}(0, 2.5) \\
+  \beta_3 &\sim \mbox{Normal}(0, 2.5) 
 \end{align}
-
-We run the model in R [@citeR] using the `rstanarm` package of @rstanarm. We use the default priors from `rstanarm`.
-
+```
+We run the model in R [@citeR] using the `rstanarm` package of
+@rstanarm. We use the default priors from `rstanarm`. All of our
+variables are Boolean categorical variables, and therefore have been
+converted to factors so the model can treat them as such.
 
 ### Model justification
 
-We expect a positive relationship between the size of the wings and time spent aloft. In particular...
+Logistic regression is employed for this model since our variable of
+interest is a binary outcome variable - a win or a loss. Logistic
+regression is well suited for situations where the outcome variable
+represents two mutually exclusive categories and its probability is
+based on a set of predictor variables (listed above).
 
-We can use maths by including latex between dollar signs, for instance $\theta$.
+Since both Rift Herald and drakes are available early on in the game, it
+would be interesting to see if early priority for both of these
+objectives would hold much influence.
 
+The Rift Herald should have a positive effect on the result of the game,
+however I expect it to be the smallest of the three. It gives a direct
+reward which is good for the short moment after its utilized, but this
+advantage doesn't scale well into the late game if the player is not
+able to use it to force a greater advantage for themselves.
 
-# Results
+It is expected for the first drake to have a greater influence on the
+game state than the Rift Herald, but less than the first Baron Nasher.
+The elemental drake buffs only get more powerful as you stack more and
+more on top of each other, and it gets really difficult for the opposing
+team to match this strength later on in the game. Dragon buff stacking
+is a strategy that takes time to take effect but is a guaranteed way to
+build a sizable advantage against your opponents, and stacking the buffs
+from the first drake spawn can allow teams to gain this advantage
+earlier than they would if they waited, and put pressure on the enemy
+team to find ways from the drake stacking to continue. It is important
+to note that it is a common occurrence in pro play to trade the Rift
+Herald for an early Drake, so it will also be interesting to see which
+of these two objectives teams should focus on early in the game.
 
-Our results are summarized in @tbl-modelresults.
+Finally, it is expected that our last neutral objective, the Baron
+Nasher, will have the greatest effect on the result of the game, much
+greater than the herald and the drake. This is because the Baron spawns
+much later in the game and is often one of the last buffs a team with a
+lead aims for before making their game ending push.
+
+# Results {#sec-results}
 
 ```{r}
+#| label: tbl-model-summary
+#| tbl-cap: Model Summary
 #| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-
-library(rstanarm)
-
-first_model <-
-  readRDS(file = here::here("models/first_model.rds"))
-```
-
-```{r}
-#| echo: false
-#| eval: true
-#| label: tbl-modelresults
-#| tbl-cap: "Explanatory models of flight time based on wing width and wing length"
 #| warning: false
 
-modelsummary::modelsummary(
+modelsummary(
   list(
-    "First model" = first_model
-  ),
-  statistic = "mad",
-  fmt = 2
-)
+    "Win" = model
+    ), 
+  statistic="mad")
+
 ```
 
+Note that for our model, we set "Loss" as our reference level for
+"result", and "No" as our reference level for "First Herald", "First
+Dragon", and "First Baron". This means that the coefficients of first
+objective captures are relative to the game state where a team isn't the
+first to capture them, which we have seen from the histograms tends to
+be more frequent when a team loses. R appropriately treats "Loss" as our
+failure case and "Win" as our success case, which directly corresponds
+to our coefficients' signs. Negative coefficients imply a decrease in
+odds for a win. Conversely, a positive coefficient imply an increase in
+odds for a win. Keeping these key pieces of information in mind, we
+proceed to our model's results.
 
+From @tbl-model-summary, we can see that our model arrived at the
+intercept of -2.168, with a standard error of 0.090. This means that we
+can say with fairly high accuracy, that when all predictors are set to
+0, i.e, when a team is not the first one to capture any of the neutral
+objectives, a team's log odds of winning are -2.168, which translates to
+roughly 10.27% probability of winning, using the formulas:
 
+$$
+odds = e^{log\_odds}   
+$$
 
-# Discussion
+$$
+p = \frac{odds}{1 + odds}
+$$
 
-## First discussion point {#sec-first-point}
+As predicted, the coefficients are positive for each of these buffs.
+However, what's interesting is the scale of these individual
+coefficients. While they agree with our hypothesis, the difference in
+their magnitudes is exceeds our expectations.
 
-If my paper were 10 pages, then should be be at least 2.5 pages. The discussion is a chance to show off what you know and what you learnt from all this. 
+First Herald, as predicted, is the least influential neutral objective,
+with the lowest coefficient of the three, coming at 0.485 with a
+standard error of 0.086. This falls in line with our hypothesis as we
+expected it to be the least influential objective. The first Drake is
+much more influential in deciding the fate of a game than the Rift
+Herald, with an increase of 0.903 in log odds when it is captured first,
+and a standard error of 0.084. Finally, we see that capturing the first
+Baron has the most substantial effect on the chances of a team winning,
+with 3.097 increase in log-odds of winning, with a standard error of
+0.083.
 
-## Second discussion point
+# Discussion {#sec-discussion}
 
-## Third discussion point
+## What was done {#sec-first-point}
 
-## Weaknesses and next steps
+Objectives are an important part of League of Legends, and are important
+part of strategies adopted by teams in the professional scene of the
+game. The objective of this paper was to see how much early control of
+these objectives influenced a team's odds of winning in the Tier 1
+professional leagues around the world. This was done by obtaining match
+data for all Tier 1 professional matches held in 2023 from Oracle's
+Elixir, a popular website among esport professionals, analysts and
+journals. Initial exploratory data analysis suggested that teams who won
+more often than not had early control of these objectives. This
+difference was much greater when it came to Baron Nasher when compared
+to both the Rift Herald and Drakes. Logistic regression modelling was
+then used to formalize this discovery, revealing a clear trend that
+aligned with our initial hypothesis: early control of Rift Herald,
+Elemental Drakes, and Baron Nasher progressively enhances a team's odds
+of winning, with the magnitude of this increase growing in the order
+they are listed.
 
-Weaknesses and next steps should also be included.
+## Early Rift Herald Control Is Effective, but Not the Best Strategy
+
+Early control of the Rift Herald is overall beneficial for teams, and
+increases a team's odds of winning. It is however, not as great as one
+might think. An increase of 0.485 log odds from the intercept value of
+-2.168 increases a team's probability from 10.27% to 15.67%. This can be
+explained by how Rift Herald works. It helps teams break down towers
+faster in the early game and accelerate one of the players into a
+greater advantage. It is up to this player then to use this edge to
+propel other players on their team forward to make a bigger advantage
+for the team as a whole. Failure to capitalize on this lead can result
+in this lead diminishing over time - even if the player maintains this
+lead for themselves, its value diminishes over time as the game goes on.
+Worst case scenario, the enemy makes up for their deficit by just
+playing well and any advantage gained from the Rift Herald is lost.
+Therefore, while it does provide an advantage, it is not significant
+enough compared to others.
+
+## Early Drake Control Appears to be Better Than Rift Herald
+
+Early Drake control increases a team's log odds of winning by 0.903. It
+is not as high as one might expect, due to how Drakes work in League of
+Legends. A team must keep stacking drakes to utilize their full
+potential. Early Drake control can help a team get a head start towards
+stacking or delay the opposition's strategy of Drake stacking. Early
+Drake control can therefore hurt an opposition by delaying their plans
+or by fast-tracking your own progress.
+
+Early Drake control does prove to be more advantageous than the Rift
+Herald, by almost double the log odds. Compared to the Rift Herald,
+which only bumps up a team's chances of winning to 15.67%, getting early
+drake control increases these odds to 22.01% - much more significant
+than the Rift Herald. There are too many factors to account for to say
+definitively that early drake control is objectively better than the
+Rift Herald, however, it does seem so that for Season 13 of Tier 1
+League of Legends, Early Drake control provided a greater advantage than
+Early Herald control.
+
+## Securing First Baron Nasher Often Leads to Victory
+
+In @fig-baron-histogram, we saw how huge the discrepancy was in teams
+who won who also secured the first Baron Nasher of the game. This falls
+in line with what our model depicts. Securing the first Baron Nasher
+overwhelmingly increases a team's odds for winning, when compared to
+Rift Herald and Elemental Drakes, with a coefficient of 3.097. This
+falls in line with our expectation that Baron Nasher has the most
+significant impact on a team's chances of winning, however, the
+difference magnitude of the coefficient compared to the two other
+objectives is what's astonishing.
+
+It is often the case that teams usually play around the Baron buff as a
+means to close out a game, as it is great for sieging the enemy base.
+However, I believe that this number might be skewed by other hidden
+factors that haven't been accounted for in the model. For example, if a
+team already has a sizable advantage before Baron even spawns, then yes,
+getting this buff with push that advantage further, but it might not be
+as big of a factor in their success as this coefficient makes it out to
+be. More in-depth research is required to say for certain how much
+exactly an early Baron capture influences the game, but this model gives
+us an approximation of how the high odds of winning are for teams who
+get to be the first ones to capture the Baron.
+
+## Weaknesses and Next Steps
+
+While we can make rough estimates as to how control of these neutral
+objectives helps a team's odds of winning, it does not show the whole
+picture. There are simply too many factors to account for to say for
+certain if a strategy is good. Moreover, these strategies won't last
+forever; League is constantly evolving, and metas might look very
+different even in the same season of pro play.
+
+League is a very complex game which evolves constantly, from new patches
+that release every two weeks, changes to the map and structure of the
+arena that players compete in, new items being introduced or reworked,
+to new champions being added to the game as well as champion reworks.
+Riot Games make balance changes to the game every two weeks, which
+influences the overall meta of the game as the season progresses through
+the year. Strategies that work today may not work tomorrow. Games played
+even a week apart may not be playing under the same meta anymore - there
+simply too many changes which forces teams to adapt their play style or
+completely change them.
+
+Other than the game itself, the skill of each individual player and how
+the players work together as a team also changes how a team approaches
+the game. A team might exploit a single person on the opposing team to
+gain an advantage, or play a strategy that counters their opponents
+strategy. Early game focused teams might ignore the drakes completely
+and focus completely on the Rift Herald if it aligns with their play
+style more - the game might end before the Baron even spawns. Teams who
+play for the late game might emphasize drake stacking more than others
+and might ignore the first Baron spawn as their team hasn't finished
+powering up yet. Moreover, these strategies might change for the same
+team from game to game.
+
+Moving forward, it is important to recognize that League of Legends is
+always changing, and there are many factors that affect how teams play
+and win. We'll need to keep studying and learning to understand it
+better.
 
 \newpage
 
 \appendix
 
-# Appendix {-}
-
-
-# Additional data details
+# Appendix {.unnumbered}
 
 # Model details {#sec-model-details}
 
 ## Posterior predictive check
 
-In @fig-ppcheckandposteriorvsprior-1 we implement a posterior predictive check. This shows...
-
-In @fig-ppcheckandposteriorvsprior-2 we compare the posterior with the prior. This shows... 
+In @fig-ppcheckandposteriorvsprior-1 we implement a posterior predictive
+check. In @fig-ppcheckandposteriorvsprior-2 we compare the posterior
+with the prior.
 
 ```{r}
-#| eval: true
-#| echo: false
-#| message: false
-#| warning: false
-#| label: fig-ppcheckandposteriorvsprior
-#| layout-ncol: 2
-#| fig-cap: "Examining how the model fits, and is affected by, the data"
+#| eval: true 
+#| echo: false 
+#| message: false 
+#| warning: false 
+#| label: fig-ppcheckandposteriorvsprior 
+#| layout-ncol: 2 
+#| fig-cap: Examining how the model fits, and is affected by, the data 
 #| fig-subcap: ["Posterior prediction check", "Comparing the posterior with the prior"]
 
-pp_check(first_model) +
-  theme_classic() +
-  theme(legend.position = "bottom")
+pp_check(model) + 
+  theme_classic() + 
+  theme(legend.position ="bottom")
 
-posterior_vs_prior(first_model) +
-  theme_minimal() +
-  scale_color_brewer(palette = "Set1") +
-  theme(legend.position = "bottom") +
+posterior_vs_prior(model) + 
+  theme_minimal() + 
+  scale_color_brewer(palette = "Set1") + 
+  theme(legend.position ="bottom") + 
   coord_flip()
 ```
 
 ## Diagnostics
 
-@fig-stanareyouokay-1 is a trace plot. It shows... This suggests...
-
-@fig-stanareyouokay-2 is a Rhat plot. It shows... This suggests...
-
 ```{r}
-#| echo: false
-#| eval: true
-#| message: false
+#| label: fig-model-cred-interval 
+#| fig-cap: Credible Intervals
+#| echo: false 
 #| warning: false
-#| label: fig-stanareyouokay
-#| fig-cap: "Checking the convergence of the MCMC algorithm"
-#| fig-subcap: ["Trace plot", "Rhat plot"]
-#| layout-ncol: 2
 
-plot(first_model, "trace")
-
-plot(first_model, "rhat")
+#modelplot(model, conf_level = 0.9) + labs(x = "90 per cent credibility interval")
 ```
 
+```{r}
+#| echo: false 
+#| eval: true 
+#| message: false 
+#| warning: false
+#| label: fig-model-trace-rhat 
+#| fig-subcap: ["Trace plot", "Rhat plot"] 
+#| layout-ncol: 2
 
+plot(model, "trace")
+
+plot(model, "rhat")
+
+```
 
 \newpage
 
-
 # References
-
-

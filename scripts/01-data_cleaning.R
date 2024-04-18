@@ -21,8 +21,7 @@ cleaned_data <-
   filter(position == "team") |>
   filter(league %in% c("LCS", "LCK", "LEC", "LPL", 
                        "PCS", "VCS", "CBLOL", "LLA")) |>
-  select("league","split","teamname","side","result","firstherald","heralds",
-         "firstbaron","barons","firstdragon","elementaldrakes", "elders") |>
+  select("league","result","firstherald","firstbaron", "firstdragon") |>
   drop_na() |>
   mutate(result = ifelse(result == 0, "Loss", "Win"),
          across(all_of(c("firstherald", "firstdragon", "firstbaron")), 

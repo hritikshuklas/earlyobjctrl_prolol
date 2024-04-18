@@ -19,8 +19,6 @@ stopifnot(
   all(analysis_data$firstherald %in% c("No", "Yes")),
   all(analysis_data$firstbaron %in% c("No", "Yes")),
   all(analysis_data$firstdragon %in% c("No", "Yes")),
-  all(between(analysis_data$elementaldrakes, 0, 4)),
-  all(between(analysis_data$heralds, 0, 2)),
   all(analysis_data$league %in% c("LCS", "LCK", "LEC", "LPL", 
                                       "PCS", "VCS", "CBLOL", "LLA"))
 )

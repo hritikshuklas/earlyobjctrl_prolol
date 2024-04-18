@@ -21,27 +21,26 @@ analysis_data <- analysis_data |>
   mutate(
     result = factor(
       result,
-      levels = c("Win", "Loss")
+      levels = c("Loss", "Win")
     ),
     firstherald = factor(
       firstherald,
-      levels = c("Yes", "No")
+      levels = c("No", "Yes")
     ),
     firstdragon = factor(
       firstdragon,
-      levels = c("Yes", "No")
+      levels = c("No", "Yes")
     ),
     firstbaron = factor(
       firstbaron,
-      levels = c("Yes", "No")
+      levels = c("No", "Yes")
     )
   )
 
 ### Model Data ####
 neutral_obj_to_result_model <-
   stan_glm(
-    formula = result ~ firstherald + heralds + firstdragon + elementaldrakes + 
-      firstbaron + barons + elders,
+    formula = result ~ firstherald + firstdragon + firstbaron,
     data = analysis_data,
     family = binomial(link="logit"),
     prior = normal(location = 0, scale = 2.5, autoscale = TRUE),
