@@ -328,12 +328,12 @@ clever steal can also result in the comeback for a team who has fallen
 behind.
 
 Unlike the Rift Herald and the drakes, the first Baron data in
-@fig-baron-histogram isn't evenly split. Although the difference is
-quite small, there is a higher frequency of teams who didn't get the
-first baron. This can only be explained if neither teams ever slayed the
-Baron, which does happen in games which snowball early really hard and
-end really quick. These games are quite uncommon, which is why the
-difference appears to be small.
+@fig-baron-histogram isn't evenly split as seen in @fig-baron-histogram
+. Although the difference is quite small, there is a higher frequency of
+teams who didn't get the first baron. This can only be explained if
+neither teams ever slayed the Baron, which does happen in games which
+snowball early really hard and end really quick. These games are quite
+uncommon, which is why the difference appears to be small.
 
 Finally, we see the true power of the Baron buff as a game-ender when we
 split our data by match results. We see that almost all teams who won
